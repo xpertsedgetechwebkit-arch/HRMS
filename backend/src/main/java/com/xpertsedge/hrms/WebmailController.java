@@ -54,7 +54,7 @@ public class WebmailController {
     try{if(!after.isEmpty()){Instant at=java.time.LocalDate.parse(after).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();spec=spec.and((root,query,cb)->cb.greaterThanOrEqualTo(root.get("createdAt"),at));}if(!before.isEmpty()){Instant at=java.time.LocalDate.parse(before).plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();spec=spec.and((root,query,cb)->cb.lessThan(root.get("createdAt"),at));}}catch(java.time.DateTimeException e){throw bad("Use valid filter dates.");}
     if(hasAttachment)spec=spec.and((root,query,cb)->{var sub=query.subquery(String.class);var file=sub.from(WebmailAttachment.class);sub.select(file.get("messageId")).where(cb.equal(file.get("messageId"),root.get("id")));return cb.exists(sub);});
     var result=messages.findAll(spec,PageRequest.of(page,200,Sort.by(Sort.Order.desc("createdAt"),Sort.Order.desc("id"))));
-    Map<String,Long> counts=new HashMap<>();for(String name:FOLDERS)counts.put(name,messages.count(owner(box.id).and(inFolder(name))));
+    Map<String,Long> counts=new HashMap<>();for(String name:FOLDERS)counts.put(name,messages.count(owner(box.id).and(inFolder(name)).and((root,query,cb)->cb.isFalse(root.get("seen")))));
     long unread=messages.count(owner(box.id).and(inFolder("Inbox")).and((root,query,cb)->cb.isFalse(root.get("seen"))));
     return Map.of("messages",result.getContent().stream().map(files::view).toList(),"connected",connected,"hasMore",result.hasNext(),"total",result.getTotalElements(),"externalAllowed",externalAllowed(box),"senderEmail",senderEmail(box),"gmailConnected",companyGmail()!=null,"provider",providerEnabled()?"mailersend":localMailEnabled?"local":"unconfigured","counts",counts,"unread",unread);
   }
