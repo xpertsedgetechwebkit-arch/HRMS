@@ -37,8 +37,23 @@ function AppsPreview() {
     {items.map(([n, d]) => <div key={n} className="xe-pv-row"><i className="sq">{n[0]}</i><span><b>{n}</b><em>{d}</em></span></div>)}</div></div>;
 }
 
+function WorkspacePreview() {
+  const cards = [
+    ['people', 'People', 'Attendance, leave and payroll'],
+    ['recruitment', 'Recruitment', 'Streamline hiring and track applicants'],
+    ['mail', 'Mail', 'Company mailboxes and secure access']
+  ];
+  return <div className="xe-workspace-preview" aria-hidden="true">
+    <div className="xe-orbit"/>
+    {cards.map(([kind, title, text]) => <div className={'xe-workspace-card ' + kind} key={kind}>
+      <span className="xe-workspace-icon">{kind === 'people' ? '◉' : kind === 'recruitment' ? '▣' : '✉'}</span>
+      <b>{title}</b><small>{text}</small>
+    </div>)}
+  </div>;
+}
+
 const COPY = {
-  hrms: {h: <>One platform for people,<br/>hiring and mail.</>, p: 'Securely manage workforce operations, recruitment and company communications from one connected workspace.', chips: ['Attendance, leave and payroll', 'Recruitment and applicant tracking', 'Company mailboxes and access']},
+  hrms: {h: <>Work, hiring and mail.<br/>Connected.</>, p: 'Bring your people operations, recruitment and company communication together in one secure workspace.', chips: []},
   mail: {h: <>Stay connected.<br/>Keep work moving.</>, p: 'Access your secure XpertsEdge mailbox for company communication, collaboration and timely updates.', chips: ['Secure company mailbox', 'Reliable delivery', 'Access from any device']}
 };
 
@@ -50,7 +65,8 @@ export function AuthShell({variant = 'hrms', title, subtitle, children}) {
       <div className="xe-brand-mid">
         <div><h2>{c.h}</h2><p>{c.p}</p></div>
         {variant === 'mail' && <MailPreview/>}
-        <ul className="xe-chips">{c.chips.map(x => <li key={x}><Tick/>{x}</li>)}</ul>
+        {variant === 'hrms' && <WorkspacePreview/>}
+        {c.chips.length > 0 && <ul className="xe-chips">{c.chips.map(x => <li key={x}><Tick/>{x}</li>)}</ul>}
       </div>
       <small>© {new Date().getFullYear()} XpertsEdge Technologies</small>
     </section>

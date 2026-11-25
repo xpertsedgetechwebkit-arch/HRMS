@@ -16,7 +16,13 @@ const APPS = [
 ];
 const I = ({n}) => <span style={{display: 'inline-flex'}} dangerouslySetInnerHTML={{__html: ic[n]}}/>;
 const Logo = () => <div className="logo">{LOGO_URL ? <img src={LOGO_URL} alt={TENANT}/> : TENANT[0].toUpperCase()}</div>;
-const currentView = () => location.hash === '#/home' ? 'home' : APPS.some(a => location.hash === '#/' + a.id) ? location.hash.slice(2) : 'webmail';
+const currentView = () => {
+  if (location.hash === '#/webmail') return 'webmail';
+  if (location.hash === '#/home' || location.hash === '') return 'home';
+
+  const app = APPS.find(item => location.hash === '#/' + item.id);
+  return app ? app.id : 'home';
+};
 const canOpen=(user,id)=>id==='webmail'||user.role==='ADMIN'||id==='hrms'&&['HR_ADMIN','EMPLOYEE'].includes(user.role)||id==='mail'&&user.role==='MAIL_ADMIN';
 const userInitials = user => {
   const parts = (user.name || '').trim().split(/\s+/).filter(Boolean);
@@ -85,8 +91,9 @@ function Login({onDone}) {
     <form className="xe-form" onSubmit={submit}>
       <label htmlFor="em">Work email</label>
       <input id="em" className="xe-input" type="email" autoComplete="username" placeholder={`you@${DOM}`} required value={f.email} onChange={e => setF({...f, email: e.target.value})}/>
-      <div className="xe-row"><label htmlFor="pw">Password</label><button type="button" className="xe-link" onClick={() => setHelp(!help)}>Forgot password?</button></div>
+      <label htmlFor="pw">Password</label>
       <PasswordField id="pw" value={f.password} onChange={e => setF({...f, password: e.target.value})}/>
+      <div className="xe-forgot-row"><button type="button" className="xe-link" onClick={() => setHelp(!help)}>Forgot password?</button></div>
       {help && <div className="xe-help" role="status">Ask your admin to reset your password.</div>}
       <button className="xe-submit" disabled={busy}>{busy && <Spinner/>}{busy ? 'Signing in…' : 'Sign in'}</button>
     </form>
