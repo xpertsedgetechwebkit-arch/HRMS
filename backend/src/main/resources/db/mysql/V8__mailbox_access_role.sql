@@ -1,0 +1,5 @@
+ALTER TABLE mailbox ADD COLUMN access_role VARCHAR(20) NOT NULL DEFAULT 'EMPLOYEE';
+
+ALTER TABLE mailbox
+ADD CONSTRAINT ck_mailbox_access_role
+CHECK (access_role IN ('ADMIN','HR_ADMIN','MAIL_ADMIN','EMPLOYEE'));

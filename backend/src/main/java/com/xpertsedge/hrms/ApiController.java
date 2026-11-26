@@ -18,6 +18,7 @@ public class ApiController {
   private final MailNamespaceRepo namespace;
   private void lockMail() { namespace.findById(1L).orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Mail workspace is initializing. Please retry.")); }
   @Value("${hrms.auth.cookie-secure:false}") private boolean secureCookie;
+  @Value("${hrms.mail.domain:xpertsedgetech.com}") private String mailDomain;
   private final AdminAuthService authService;
   private final NotificationService notices; private final NotificationRepo notificationRepo;
   private final UserRepo users; private final MailboxRepo boxes; private final AliasRepo aliases; private final JwtService jwt; private final BCryptPasswordEncoder enc; private final WebmailAuth webmailAuth;
@@ -47,6 +48,11 @@ public class ApiController {
     String name=str(b,"displayName");
     if(name.length()>200 || name.chars().anyMatch(Character::isISOControl)) throw bad("Display name must be at most 200 characters without control characters.");
     return name.isEmpty() ? fallback : name;
+  }
+  private static String mailboxRole(Map<String,Object> b) {
+    String role=str(b,"accessRole").toUpperCase(Locale.ROOT);
+    if(!Set.of("ADMIN","HR_ADMIN","MAIL_ADMIN","EMPLOYEE").contains(role)) throw bad("Choose a valid access level.");
+    return role;
   }
   private static Map<String, Object> view(AppUser u) {
     return OrgController.viewUser(u); }
@@ -102,13 +108,28 @@ public class ApiController {
   @GetMapping("/mail/mailboxes") public List<Mailbox> list() { return boxes.findAll(); }
 
   @PostMapping("/mail/mailboxes")
-  @Transactional public Mailbox create(@RequestBody Map<String, Object> b) {
+  @Transactional public Mailbox create(@RequestBody Map<String, Object> b, HttpServletRequest request) {
     lockMail();
     String a = address(b, "address");
     if (boxes.existsByAddress(a) || aliases.existsByAlias(a)) throw bad("That address already exists.");
+    String role=mailboxRole(b);
+    // A mail administrator can provision employee mailboxes but cannot grant
+    // HRMS administrator, HR administrator or mail administrator privileges.
+    if(!"ADMIN".equals(request.getAttribute("role")) && !"EMPLOYEE".equals(role))
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Only an HRMS administrator can assign administrator privileges.");
+    String rawPassword=password(b), accountEmail=a+"@"+mailDomain.trim().toLowerCase(Locale.ROOT);
+    AppUser account=users.findByEmail(accountEmail).orElse(null);
+    if(account!=null && !role.equals(account.role))
+      throw bad("This email already has an HRMS account. Change its access level from Organization > Users.");
     Mailbox m = new Mailbox(); m.address = a; m.displayName = displayName(b,a);
+    m.accessRole=role;
     m.quotaGb = b.containsKey("quotaGb") ? quota(b) : 2;
-    m.passwordHash = enc.encode(password(b)); boxes.save(m); notices.add("Mailbox record created", m.address + " was created locally. Mail provider is not connected."); return m;
+    m.passwordHash = enc.encode(rawPassword); boxes.save(m);
+    if(account==null){
+      account=new AppUser(); account.email=accountEmail; account.name=m.displayName; account.role=role;
+      account.active=true; account.passwordHash=enc.encode(rawPassword); users.save(account);
+    }
+    notices.add("Mailbox record created",m.address+" was created with "+role+" access. Mail provider is not connected."); return m;
   }
   @PutMapping("/mail/mailboxes/{id}")
   @Transactional public Mailbox edit(@PathVariable Long id, @RequestBody Map<String, Object> b) {
