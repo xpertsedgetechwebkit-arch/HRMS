@@ -53,6 +53,7 @@ export function MailLogin({onDone,home}) {
 
 export function Webmail({user,home,canReturnToHrms=false,out,expired}) {
   const [panel,setPanel]=useState('Mail'),[preferences,setPreferences]=useState({theme:'light',density:'compact',shortcuts:true,signature:'',timeZone:'Asia/Kolkata'}),[checked,setChecked]=useState([]);
+  const [panel,setPanel]=useState('Mail'),[preferences,setPreferences]=useState({theme:'light',density:'compact',shortcuts:true,signature:'',timeZone:'Asia/Kolkata'}),[checked,setChecked]=useState([]),[themeSaving,setThemeSaving]=useState(false);
   useEffect(()=>{mailApi('/preferences').then(setPreferences).catch(()=>{});},[]);
   useEffect(()=>{const url=new URL(window.location.href),code=url.searchParams.get('gmail');if(!code)return;try{sessionStorage.setItem('wm_gmail_notice',gmailNotice(code));}catch{}url.searchParams.delete('gmail');window.history.replaceState(null,'',url.pathname+url.search+url.hash);setPanel('Settings');},[]);
   const [folder,setFolder]=useState('Inbox'),[query,setQuery]=useState(''),[searchText,setSearchText]=useState('');
@@ -104,13 +105,11 @@ export function Webmail({user,home,canReturnToHrms=false,out,expired}) {
   async function sendMessage(){if(busy)return;setBusy(true);try{const saved=await persistDraft();setCompose(saved);await mailApi('/send',{method:'POST',body:{id:saved.id,...payload(saved)}});setCompose(null);setFolder('Sent');setQuery('');setSearchText('');setSelected(saved.id);setMessage('SMTP accepted the message. See its delivery status.');await refresh();}catch(error){setMessage(error.message);await refresh();}finally{setBusy(false);}}
   async function selectMessage(record){
     setSelected(record.id);
-    if(record.seen||record.folder==='Drafts')return;
     if(record.seen)return;
     setRecords(previous=>previous.map(item=>item.id===record.id?{...item,seen:true}:item));
     setCounts(previous=>({...previous,[record.folder]:Math.max(0,(previous[record.folder]||0)-1)}));
     if(record.folder==='Inbox'){
       setUnread(previous=>Math.max(0,previous-1));
-      setCounts(previous=>({...previous,Inbox:Math.max(0,(previous.Inbox||0)-1)}));
       unreadNotice.current.count=Math.max(0,unreadNotice.current.count-1);
     }
     try{await mailApi('/messages/'+record.id,{method:'PATCH',body:{seen:true}});await refresh();}
@@ -139,16 +138,26 @@ export function Webmail({user,home,canReturnToHrms=false,out,expired}) {
     try{await mailApi('/messages/'+record.id,{method:'PATCH',body:{starred}});}
     catch(error){setRecords(previous=>previous.map(item=>item.id===record.id?{...item,starred:!starred}:item));setMessage(error.message);}
   }
+  async function toggleTheme(){
+    if(themeSaving)return;
+    const next={...preferences,theme:preferences.theme==='dark'?'light':'dark'};
+    setPreferences(next);
+    setThemeSaving(true);
+    try{setPreferences(await mailApi('/preferences',{method:'PUT',body:next}));}
+    catch(error){setPreferences(preferences);setMessage('Theme could not be saved: '+error.message);}
+    finally{setThemeSaving(false);}
+  }
   return <div className={'wm-app wm-dark wm-modern'+(preferences.theme==='dark'?' wm-theme-dark':'')+(preferences.density==='comfortable'?' wm-comfortable':'')+(collapsed?' wm-collapsed':'')}>
     <aside className="wm-rail" aria-label="Workspace navigation">
       {canReturnToHrms?<button className="wm-logo-button" title="XpertsEdge Home" aria-label="XpertsEdge home" onClick={()=>leave(home)}><img src="/logo.png" alt="XpertsEdge"/></button>:<div className="wm-logo-static" aria-label="XpertsEdge Mail"><img src="/logo.png" alt="XpertsEdge"/></div>}
       {[['Mail','mail',()=>{if(window.matchMedia('(max-width:760px)').matches)setCollapsed(value=>!value);else folderChange('Inbox');}],['Calendar','Calendar',()=>{if(mayDiscard())setPanel('Calendar');}],['Contacts','Contacts',()=>{if(mayDiscard())setPanel('Contacts');}],['Files','Storage',()=>{if(mayDiscard())setPanel('Storage');}],['Settings','Settings',()=>{if(mayDiscard())setPanel('Settings');}]].map(([label,icon,action])=><button key={label} className={(label==='Mail'?panel==='Mail':panel===label||label==='Files'&&panel==='Storage')?'active':''} title={label} aria-label={label} onClick={action}><MailIcon name={icon}/><span>{label}</span></button>)}
+      <button className="wm-theme-toggle" type="button" title={preferences.theme==='dark'?'Switch to light mode':'Switch to dark mode'} aria-label={preferences.theme==='dark'?'Switch to light mode':'Switch to dark mode'} aria-pressed={preferences.theme==='dark'} onClick={toggleTheme}><span>{preferences.theme==='dark'?'Light mode':'Dark mode'}</span></button>
+      <button className={'wm-theme-toggle'+(themeSaving?' is-saving':'')} type="button" title={preferences.theme==='dark'?'Switch to light mode':'Switch to dark mode'} aria-label={preferences.theme==='dark'?'Switch to light mode':'Switch to dark mode'} aria-pressed={preferences.theme==='dark'} aria-busy={themeSaving} disabled={themeSaving} onClick={toggleTheme}><span>{preferences.theme==='dark'?'Light mode':'Dark mode'}</span></button>
       <div className="wm-rail-bottom">{canReturnToHrms&&<button title="Back to HRMS" aria-label="Back to HRMS" onClick={()=>leave(home)}><MailIcon name="back"/><span>HRMS</span></button>}<button title="Sign out" aria-label="Sign out" onClick={()=>leave(out)}><MailIcon name="logout"/><span>Logout</span></button></div>
     </aside>{!collapsed&&<button className="wm-scrim" aria-label="Close folders" onClick={()=>setCollapsed(true)}/>} 
     <aside className="wm-sidebar" aria-label="Mailbox folders">
       <button className="wm-compose-button" onClick={newMessage}><MailIcon name="compose"/> <span>Compose</span></button>
       <div className="wm-section-title"><strong>Folders</strong></div>
-      <nav aria-label="Mail folders">{folders.map(name=><button key={name} aria-current={folder===name&&!query?'page':undefined} className={folder===name&&!query?'active':''} onClick={()=>folderChange(name)}><span className={'wm-folder-icon wm-folder-'+name}><MailIcon name={name}/></span><span>{name}</span>{name==='Inbox'&&unread>0&&<b>{unread}</b>}</button>)}</nav>
       <nav aria-label="Mail folders">{folders.map(name=>{const folderUnread=name==='Inbox'?unread:(counts[name]||0);return <button key={name} aria-current={folder===name&&!query?'page':undefined} className={folder===name&&!query?'active':''} onClick={()=>folderChange(name)}><span className={'wm-folder-icon wm-folder-'+name}><MailIcon name={name}/></span><span>{name}</span>{folderUnread>0&&<b>{folderUnread}</b>}</button>})}</nav>
       <div className="wm-sidebar-bottom"><span className="wm-connection"><i/>{connected?(provider==='mailersend'?'MailerSend connected':'Mail service connected'):'Mail service offline'}</span><small title={user.email}>{user.email}</small></div>
     </aside>

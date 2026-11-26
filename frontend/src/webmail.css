@@ -142,10 +142,27 @@
 .wm-collapse span,.wm-theme-toggle{font-size:0}
 .wm-collapse span{display:block;width:22px;height:22px;background:currentColor;
   -webkit-mask:var(--ico-menu) center/contain no-repeat;mask:var(--ico-menu) center/contain no-repeat}
-.wm-theme-toggle::before{content:"";display:block;width:22px;height:22px;background:currentColor;
-  -webkit-mask:var(--ico-moon) center/contain no-repeat;mask:var(--ico-moon) center/contain no-repeat}
-.wm-theme-dark .wm-theme-toggle::before{
-  -webkit-mask-image:var(--ico-sun);mask-image:var(--ico-sun)}
+.wm-theme-toggle{
+  position:relative;min-height:60px!important;font-size:0!important;
+  transition:background-color .22s ease,color .22s ease,box-shadow .22s ease!important;
+}
+.wm-theme-toggle span{
+  display:block!important;position:absolute;right:0;bottom:7px;left:0;
+  font-size:10px!important;font-weight:500;line-height:1.1;text-align:center;
+}
+.wm-theme-toggle::before,.wm-theme-toggle::after{
+  content:"";position:absolute;top:18px;left:50%;width:22px;height:22px;
+  background:currentColor;transform:translate(-50%,-50%) scale(1);
+  transition:opacity .22s ease,transform .22s cubic-bezier(.2,.8,.2,1);
+  pointer-events:none;
+}
+.wm-theme-toggle::before{-webkit-mask:var(--ico-moon) center/contain no-repeat;mask:var(--ico-moon) center/contain no-repeat;opacity:1}
+.wm-theme-toggle::after{-webkit-mask:var(--ico-sun) center/contain no-repeat;mask:var(--ico-sun) center/contain no-repeat;opacity:0;transform:translate(-50%,-50%) scale(.72)}
+.wm-theme-dark .wm-theme-toggle::before{opacity:0;transform:translate(-50%,-50%) scale(.72)}
+.wm-theme-dark .wm-theme-toggle::after{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.wm-theme-toggle:hover:not(:disabled){box-shadow:0 5px 13px rgba(16,35,26,.12)}
+.wm-theme-toggle:active:not(:disabled){box-shadow:inset 0 0 0 999px rgba(20,112,59,.08)}
+@media(prefers-reduced-motion:reduce){.wm-theme-toggle,.wm-theme-toggle::before,.wm-theme-toggle::after{transition:none!important;animation:none!important}}
 .wm-search{
   display:flex;align-items:center;gap:12px;flex:1;min-width:0;height:52px;padding:0 18px;
   border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--mut);
